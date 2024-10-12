@@ -49,7 +49,7 @@ int main(int argc, char *argv[]) {
         }
 
         // Skip factor to improve performance at higher zoom levels
-        int skip = (int)(zoom > 10 ? zoom / 5 : 1);
+        int skip = 1; // Always render all pixels to maintain resolution
         // Adjusted iteration count to maintain performance at higher zoom levels
         int adjustedIterations = (int)(maxIterations / sqrt(zoom));
         if (adjustedIterations < 100) {
