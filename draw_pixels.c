@@ -43,9 +43,12 @@ int main(int argc, char *argv[]) {
     // Variables to track the viewport
     double velocityX = 0.0;
     double velocityY = 0.0;
+    double targetOffsetX = offsetX;
+    double targetOffsetY = offsetY;
     const double acceleration = 0.005;
     const double maxSpeed = 0.05;
     const double deceleration = 0.9;
+    const double clickSpeed = 0.1; // Speed factor for moving towards click target
 
     while(!quit) {
         // Handle user events, e.g., quit or key presses
@@ -56,9 +59,9 @@ int main(int argc, char *argv[]) {
                 if (e.button.button == SDL_BUTTON_LEFT) {
                     int mouseX, mouseY;
                     SDL_GetMouseState(&mouseX, &mouseY);
-                    // Calculate new offsets to center the clicked point
-                    offsetX = (mouseX - SCREEN_WIDTH / 2.0) * 4.0 / (SCREEN_WIDTH * zoom) + offsetX;
-                    offsetY = (mouseY - SCREEN_HEIGHT / 2.0) * 4.0 / (SCREEN_WIDTH * zoom) + offsetY;
+                    // Set new target offsets to center the clicked point
+                    targetOffsetX = (mouseX - SCREEN_WIDTH / 2.0) * 4.0 / (SCREEN_WIDTH * zoom) + offsetX;
+                    targetOffsetY = (mouseY - SCREEN_HEIGHT / 2.0) * 4.0 / (SCREEN_WIDTH * zoom) + offsetY;
                 }
             } else if (e.type == SDL_KEYDOWN) {
                 switch (e.key.keysym.sym) {
@@ -85,6 +88,12 @@ int main(int argc, char *argv[]) {
                 }
             }
         }
+
+        // Move towards target offsets smoothly
+        double diffX = targetOffsetX - offsetX;
+        double diffY = targetOffsetY - offsetY;
+        offsetX += diffX * clickSpeed;
+        offsetY += diffY * clickSpeed;
 
         // Clamp velocities to max speed
         if (velocityX > maxSpeed) velocityX = maxSpeed;
