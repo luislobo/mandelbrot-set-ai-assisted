@@ -74,6 +74,12 @@ int main(int argc, char *argv[]) {
                         velocityX += acceleration;
                         break;
                 }
+            } else if (e.type == SDL_MOUSEWHEEL) {
+                if (e.wheel.y > 0) {
+                    zoom *= 1.1; // Zoom in
+                } else if (e.wheel.y < 0) {
+                    zoom /= 1.1; // Zoom out
+                }
             }
         }
 
@@ -150,9 +156,6 @@ int main(int argc, char *argv[]) {
 
         // Update the window surface to show the new frame
         SDL_UpdateWindowSurface(window);
-
-        // Gradually zoom in for animation effect
-        zoom *= 1.02;
     }
 
     // Free the color buffer memory
