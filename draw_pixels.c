@@ -41,7 +41,27 @@ int main(int argc, char *argv[]) {
     Uint32* colorBuffer = (Uint32*)malloc(SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(Uint32));
 
     while(!quit) {
-        // Handle user events, e.g., quit
+        // Handle user events, e.g., quit or key presses
+        while(SDL_PollEvent(&e) != 0) {
+            if(e.type == SDL_QUIT) {
+                quit = true;
+            } else if (e.type == SDL_KEYDOWN) {
+                switch (e.key.keysym.sym) {
+                    case SDLK_UP:
+                        offsetY -= 0.05 / zoom; // Pan up
+                        break;
+                    case SDLK_DOWN:
+                        offsetY += 0.05 / zoom; // Pan down
+                        break;
+                    case SDLK_LEFT:
+                        offsetX -= 0.05 / zoom; // Pan left
+                        break;
+                    case SDLK_RIGHT:
+                        offsetX += 0.05 / zoom; // Pan right
+                        break;
+                }
+            }
+        }
         while(SDL_PollEvent(&e) != 0) {
             if(e.type == SDL_QUIT) {
                 quit = true;
