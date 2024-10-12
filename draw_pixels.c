@@ -40,6 +40,10 @@ int main(int argc, char *argv[]) {
     // Buffer to store color values before rendering
     Uint32* colorBuffer = (Uint32*)malloc(SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(Uint32));
 
+    // Variables to track the viewport
+    int viewportX = 0;
+    int viewportY = 0;
+
     while(!quit) {
         // Handle user events, e.g., quit or key presses
         static double velocityX = 0.0;
@@ -51,26 +55,16 @@ int main(int argc, char *argv[]) {
         while(SDL_PollEvent(&e) != 0) {
             if(e.type == SDL_QUIT) {
                 quit = true;
-            } else if (e.type == SDL_KEYDOWN) {
-                switch (e.key.keysym.sym) {
-                    case SDLK_UP:
-                        velocityY -= acceleration;
-                        if (velocityY < -maxSpeed) velocityY = -maxSpeed;
-                        break;
-                    case SDLK_DOWN:
-                        velocityY += acceleration;
-                        if (velocityY > maxSpeed) velocityY = maxSpeed;
-                        break;
-                    case SDLK_LEFT:
-                        velocityX -= acceleration;
-                        if (velocityX < -maxSpeed) velocityX = -maxSpeed;
-                        break;
-                    case SDLK_RIGHT:
-                        velocityX += acceleration;
-                        if (velocityX > maxSpeed) velocityX = maxSpeed;
-                        break;
+            } else if (e.type == SDL_MOUSEBUTTONDOWN) {
+                if (e.button.button == SDL_BUTTON_LEFT) {
+                    int mouseX, mouseY;
+                    SDL_GetMouseState(&mouseX, &mouseY);
+                    // Calculate new offsets to center the clicked point
+                    offsetX = (mouseX - SCREEN_WIDTH / 2.0) * 4.0 / (SCREEN_WIDTH * zoom) + offsetX;
+                    offsetY = (mouseY - SCREEN_HEIGHT / 2.0) * 4.0 / (SCREEN_WIDTH * zoom) + offsetY;
                 }
-            } else if (e.type == SDL_KEYUP) {
+            }
+        else if (e.type == SDL_KEYUP) {
                 switch (e.key.keysym.sym) {
                     case SDLK_UP:
                     case SDLK_DOWN:
@@ -88,14 +82,13 @@ int main(int argc, char *argv[]) {
         offsetX += velocityX / zoom;
         offsetY += velocityY / zoom;
 
+        // Update viewport based on velocity
+        
+
         // Apply deceleration when no key is pressed
         velocityX *= deceleration;
         velocityY *= deceleration;
-        while(SDL_PollEvent(&e) != 0) {
-            if(e.type == SDL_QUIT) {
-                quit = true;
-            }
-        }
+        
 
         // Skip factor to improve performance at higher zoom levels
         int skip = 1; // Always render all pixels to maintain resolution
@@ -106,9 +99,9 @@ int main(int argc, char *argv[]) {
         }
 
         // Calculate the Mandelbrot set and store the color values in the buffer
-        #pragma omp parallel for schedule(dynamic, 4)
-        for(int y = 0; y < SCREEN_HEIGHT; y += skip) {
-            for(int x = 0; x < SCREEN_WIDTH; x += skip) {
+        #pragma omp parallel for schedule(dynamic, 4) collapse(2)
+        for(int y = viewportY; y < SCREEN_HEIGHT && y >= 0; y += skip) {
+            for(int x = viewportX; x < SCREEN_WIDTH && x >= 0; x += skip) {
 
                 // Calculate the real and imaginary components of the complex number
                 double cr = (x - SCREEN_WIDTH / 2.0) * 4.0 / (SCREEN_WIDTH * zoom) + offsetX;
@@ -175,8 +168,12 @@ int main(int argc, char *argv[]) {
         // Lock the surface to directly manipulate the pixels
         SDL_LockSurface(screenSurface);
 
-        // Copy the color buffer to the screen surface
-        memcpy(screenSurface->pixels, colorBuffer, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(Uint32));
+        // Copy only the changed portion of the color buffer to the screen surface
+        for(int y = viewportY; y < SCREEN_HEIGHT && y >= 0; y++) {
+            for(int x = viewportX; x < SCREEN_WIDTH && x >= 0; x++) {
+                ((Uint32*)screenSurface->pixels)[y * SCREEN_WIDTH + x] = colorBuffer[y * SCREEN_WIDTH + x];
+            }
+        }
 
         // Unlock the surface
         SDL_UnlockSurface(screenSurface);
