@@ -27,6 +27,10 @@ int main(int argc, char *argv[]) {
 
     SDL_Event e;
 
+    double zoom = 1.0;
+    double offsetX = 0.0;
+    double offsetY = 0.0;
+
     while(!quit) {
         while(SDL_PollEvent(&e) != 0) {
             if(e.type == SDL_QUIT) {
@@ -39,13 +43,13 @@ int main(int argc, char *argv[]) {
 
         Uint32* pixels = (Uint32*)screenSurface->pixels;
 
-        // Draw a colorful mandelbrot set
+        // Draw a colorful mandelbrot set with zoom
         for(int y = 0; y < SCREEN_HEIGHT; y++) {
             for(int x = 0; x < SCREEN_WIDTH; x++) {
 
-                // Calculate the mandelbrot set
-                double cr = (x - SCREEN_WIDTH/2.0) * 4.0 / SCREEN_WIDTH;
-                double ci = (y - SCREEN_HEIGHT/2.0) * 4.0 / SCREEN_WIDTH;
+                // Calculate the mandelbrot set with zoom and offset
+                double cr = (x - SCREEN_WIDTH/2.0) * 4.0 / (SCREEN_WIDTH * zoom) + offsetX;
+                double ci = (y - SCREEN_HEIGHT/2.0) * 4.0 / (SCREEN_WIDTH * zoom) + offsetY;
                 double zr = 0, zi = 0;
                 int i = 0;
                 while(i < 1000 && zr*zr + zi*zi < 4.0) {
@@ -60,7 +64,7 @@ int main(int argc, char *argv[]) {
                     // Points inside the Mandelbrot set are colored with a fiery gradient
                     double magnitude = sqrt(zr * zr + zi * zi);
                     int red = (int)(fabs(sin(magnitude)) * 255);
-                    int green = (int)(fabs(sin(magnitude)) * 100); // Reduce green for a more fiery look
+                    int green = (int)(fabs(sin(magnitude)) * 50); // Further reduce green for a more fiery look
                     int blue = 0; // Set blue to 0 for warm colors only
                     pixels[y * SCREEN_WIDTH + x] = SDL_MapRGB(screenSurface->format, red, green, blue);
                 } else {
@@ -74,6 +78,9 @@ int main(int argc, char *argv[]) {
         SDL_UnlockSurface(screenSurface);
 
         SDL_UpdateWindowSurface(window);
+
+        // Zoom in gradually
+        zoom *= 1.05;
     }
 
     SDL_DestroyWindow(window);
