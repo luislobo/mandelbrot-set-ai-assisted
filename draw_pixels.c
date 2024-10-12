@@ -29,11 +29,10 @@ int main(int argc, char *argv[]) {
     SDL_Surface* screenSurface = SDL_GetWindowSurface(window);
 
     bool quit = false;  // Flag to indicate when to exit the main loop
-
     SDL_Event e;  // Event handler to capture user events
 
     double zoom = 1.0;        // Zoom level of the Mandelbrot set visualization
-    double offsetX = -0.75;     // Horizontal offset for panning the view
+    double offsetX = -0.75;   // Horizontal offset for panning the view
     double offsetY = 0.1;     // Vertical offset for panning the view
     int maxIterations = 1000; // Maximum number of iterations to determine if a point belongs to the Mandelbrot set
 
@@ -41,17 +40,14 @@ int main(int argc, char *argv[]) {
     Uint32* colorBuffer = (Uint32*)malloc(SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(Uint32));
 
     // Variables to track the viewport
-    int viewportX = 0;
-    int viewportY = 0;
+    double velocityX = 0.0;
+    double velocityY = 0.0;
+    const double acceleration = 0.005;
+    const double maxSpeed = 0.05;
+    const double deceleration = 0.9;
 
     while(!quit) {
         // Handle user events, e.g., quit or key presses
-        static double velocityX = 0.0;
-        static double velocityY = 0.0;
-        const double acceleration = 0.005;
-        const double maxSpeed = 0.05;
-        const double deceleration = 0.9;
-
         while(SDL_PollEvent(&e) != 0) {
             if(e.type == SDL_QUIT) {
                 quit = true;
@@ -63,65 +59,56 @@ int main(int argc, char *argv[]) {
                     offsetX = (mouseX - SCREEN_WIDTH / 2.0) * 4.0 / (SCREEN_WIDTH * zoom) + offsetX;
                     offsetY = (mouseY - SCREEN_HEIGHT / 2.0) * 4.0 / (SCREEN_WIDTH * zoom) + offsetY;
                 }
-            }
-        else if (e.type == SDL_KEYUP) {
+            } else if (e.type == SDL_KEYDOWN) {
                 switch (e.key.keysym.sym) {
                     case SDLK_UP:
+                        velocityY -= acceleration;
+                        break;
                     case SDLK_DOWN:
-                        velocityY *= deceleration;
+                        velocityY += acceleration;
                         break;
                     case SDLK_LEFT:
+                        velocityX -= acceleration;
+                        break;
                     case SDLK_RIGHT:
-                        velocityX *= deceleration;
+                        velocityX += acceleration;
                         break;
                 }
             }
         }
 
+        // Clamp velocities to max speed
+        if (velocityX > maxSpeed) velocityX = maxSpeed;
+        if (velocityX < -maxSpeed) velocityX = -maxSpeed;
+        if (velocityY > maxSpeed) velocityY = maxSpeed;
+        if (velocityY < -maxSpeed) velocityY = -maxSpeed;
+
         // Apply velocity to offsets
         offsetX += velocityX / zoom;
         offsetY += velocityY / zoom;
 
-        // Update viewport based on velocity
-        
-
         // Apply deceleration when no key is pressed
         velocityX *= deceleration;
         velocityY *= deceleration;
-        
 
-        // Skip factor to improve performance at higher zoom levels
-        int skip = 1; // Always render all pixels to maintain resolution
-        // Adjusted iteration count to maintain performance at higher zoom levels
-        int adjustedIterations = (int)(maxIterations / sqrt(zoom));
+        // Adjust iteration count based on zoom level to maintain performance
+        int adjustedIterations = maxIterations / (1 + log2(zoom));
         if (adjustedIterations < 100) {
             adjustedIterations = 100; // Ensure a minimum number of iterations
         }
 
         // Calculate the Mandelbrot set and store the color values in the buffer
         #pragma omp parallel for schedule(dynamic, 4) collapse(2)
-        for(int y = viewportY; y < SCREEN_HEIGHT && y >= 0; y += skip) {
-            for(int x = viewportX; x < SCREEN_WIDTH && x >= 0; x += skip) {
-
+        for(int y = 0; y < SCREEN_HEIGHT; y++) {
+            for(int x = 0; x < SCREEN_WIDTH; x++) {
                 // Calculate the real and imaginary components of the complex number
                 double cr = (x - SCREEN_WIDTH / 2.0) * 4.0 / (SCREEN_WIDTH * zoom) + offsetX;
                 double ci = (y - SCREEN_HEIGHT / 2.0) * 4.0 / (SCREEN_WIDTH * zoom) + offsetY;
 
                 // Early escape for points known to be inside the main cardioid or period-2 bulb
-                double q = (cr - 0.25) * (cr - 0.25) + ci * ci; // Represents a value used to determine if the point is within the main cardioid or period-2 bulb
-                // If 'q' meets specific conditions, it means the point is definitely inside the set, allowing us to skip further calculations
-                // The conditions used below are derived from properties of the Mandelbrot set:
-                // 1. If q * (q + (cr - 0.25)) < 0.25 * ci * ci, the point is inside the main cardioid.
-                // 2. If (cr + 1) * (cr + 1) + ci * ci < 0.0625, the point is inside the period-2 bulb.
+                double q = (cr - 0.25) * (cr - 0.25) + ci * ci;
                 if (q * (q + (cr - 0.25)) < 0.25 * ci * ci || (cr + 1) * (cr + 1) + ci * ci < 0.0625) {
-                    // Set the color to black for points inside the set
-                    for (int sy = 0; sy < skip; sy++) {
-                        for (int sx = 0; sx < skip; sx++) {
-                            if (y + sy < SCREEN_HEIGHT && x + sx < SCREEN_WIDTH) {
-                                colorBuffer[(y + sy) * SCREEN_WIDTH + (x + sx)] = SDL_MapRGB(screenSurface->format, 0, 0, 0);
-                            }
-                        }
-                    }
+                    colorBuffer[y * SCREEN_WIDTH + x] = SDL_MapRGB(screenSurface->format, 0, 0, 0);
                     continue;
                 }
 
@@ -140,40 +127,23 @@ int main(int argc, char *argv[]) {
                 double t = (double)i / adjustedIterations;
                 int red, green, blue;
                 if (i == adjustedIterations) {
-                    // Points inside the Mandelbrot set are colored with a deep red
-                    red = 0;
-                    green = 0;
-                    blue = 0;
+                    red = green = blue = 0;
                 } else {
-                    // Points outside the Mandelbrot set are colored using a cycling gradient
-                    red = (int)(255 * (0.5 * sin(zoom * 0.1 + t * 6.28) + 0.5));
-                    green = (int)(150 * (0.5 * sin(zoom * 0.1 + t * 6.28 + 2.0) + 0.5));
-                    blue = (int)(50 * (0.5 * sin(zoom * 0.1 + t * 6.28 + 4.0) + 0.5));
+                    red = (int)(200 * (0.5 * sin(0.1 + t * 3.14) + 0.5));
+                    green = (int)(100 * (0.5 * sin(0.1 + t * 3.14 + 1.0) + 0.5));
+                    blue = (int)(50 * (0.5 * sin(0.1 + t * 3.14 + 2.0) + 0.5));
                 }
 
                 // Map the RGB color to the SDL color format
-                Uint32 color = SDL_MapRGB(screenSurface->format, red, green, blue);
-
-                // Set the color for the current pixel and its neighbors if skipping
-                for (int sy = 0; sy < skip; sy++) {
-                    for (int sx = 0; sx < skip; sx++) {
-                        if (y + sy < SCREEN_HEIGHT && x + sx < SCREEN_WIDTH) {
-                            colorBuffer[(y + sy) * SCREEN_WIDTH + (x + sx)] = color;
-                        }
-                    }
-                }
+                colorBuffer[y * SCREEN_WIDTH + x] = SDL_MapRGB(screenSurface->format, red, green, blue);
             }
         }
 
         // Lock the surface to directly manipulate the pixels
         SDL_LockSurface(screenSurface);
 
-        // Copy only the changed portion of the color buffer to the screen surface
-        for(int y = viewportY; y < SCREEN_HEIGHT && y >= 0; y++) {
-            for(int x = viewportX; x < SCREEN_WIDTH && x >= 0; x++) {
-                ((Uint32*)screenSurface->pixels)[y * SCREEN_WIDTH + x] = colorBuffer[y * SCREEN_WIDTH + x];
-            }
-        }
+        // Copy the color buffer to the screen surface
+        memcpy(screenSurface->pixels, colorBuffer, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(Uint32));
 
         // Unlock the surface
         SDL_UnlockSurface(screenSurface);
