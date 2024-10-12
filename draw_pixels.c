@@ -42,26 +42,55 @@ int main(int argc, char *argv[]) {
 
     while(!quit) {
         // Handle user events, e.g., quit or key presses
+        static double velocityX = 0.0;
+        static double velocityY = 0.0;
+        const double acceleration = 0.005;
+        const double maxSpeed = 0.05;
+        const double deceleration = 0.9;
+
         while(SDL_PollEvent(&e) != 0) {
             if(e.type == SDL_QUIT) {
                 quit = true;
             } else if (e.type == SDL_KEYDOWN) {
                 switch (e.key.keysym.sym) {
                     case SDLK_UP:
-                        offsetY -= 0.05 / zoom; // Pan up
+                        velocityY -= acceleration;
+                        if (velocityY < -maxSpeed) velocityY = -maxSpeed;
                         break;
                     case SDLK_DOWN:
-                        offsetY += 0.05 / zoom; // Pan down
+                        velocityY += acceleration;
+                        if (velocityY > maxSpeed) velocityY = maxSpeed;
                         break;
                     case SDLK_LEFT:
-                        offsetX -= 0.05 / zoom; // Pan left
+                        velocityX -= acceleration;
+                        if (velocityX < -maxSpeed) velocityX = -maxSpeed;
                         break;
                     case SDLK_RIGHT:
-                        offsetX += 0.05 / zoom; // Pan right
+                        velocityX += acceleration;
+                        if (velocityX > maxSpeed) velocityX = maxSpeed;
+                        break;
+                }
+            } else if (e.type == SDL_KEYUP) {
+                switch (e.key.keysym.sym) {
+                    case SDLK_UP:
+                    case SDLK_DOWN:
+                        velocityY *= deceleration;
+                        break;
+                    case SDLK_LEFT:
+                    case SDLK_RIGHT:
+                        velocityX *= deceleration;
                         break;
                 }
             }
         }
+
+        // Apply velocity to offsets
+        offsetX += velocityX / zoom;
+        offsetY += velocityY / zoom;
+
+        // Apply deceleration when no key is pressed
+        velocityX *= deceleration;
+        velocityY *= deceleration;
         while(SDL_PollEvent(&e) != 0) {
             if(e.type == SDL_QUIT) {
                 quit = true;
