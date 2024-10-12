@@ -32,6 +32,7 @@ int main(int argc, char *argv[]) {
     SDL_Event e;  // Event handler to capture user events
 
     double zoom = 1.0;        // Zoom level of the Mandelbrot set visualization
+    double zoomSpeed = 1.02;  // Zoom speed factor
     double offsetX = -0.75;   // Horizontal offset for panning the view
     double offsetY = 0.1;     // Vertical offset for panning the view
     int maxIterations = 1000; // Maximum number of iterations to determine if a point belongs to the Mandelbrot set
@@ -76,9 +77,11 @@ int main(int argc, char *argv[]) {
                 }
             } else if (e.type == SDL_MOUSEWHEEL) {
                 if (e.wheel.y > 0) {
-                    zoom *= 1.1; // Zoom in
+                    zoomSpeed *= 1.01; // Gradually increase zoom speed for zooming in
+                    if (zoomSpeed > 1.1) zoomSpeed = 1.1; // Cap the zoom speed
                 } else if (e.wheel.y < 0) {
-                    zoom /= 1.1; // Zoom out
+                    zoomSpeed *= 0.99; // Gradually decrease zoom speed for zooming out
+                    if (zoomSpeed < 0.9) zoomSpeed = 0.9; // Cap the zoom speed
                 }
             }
         }
@@ -156,6 +159,9 @@ int main(int argc, char *argv[]) {
 
         // Update the window surface to show the new frame
         SDL_UpdateWindowSurface(window);
+
+        // Apply automatic zoom with the current zoom speed
+        zoom *= zoomSpeed;
     }
 
     // Free the color buffer memory
