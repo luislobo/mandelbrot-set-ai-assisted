@@ -30,6 +30,7 @@ int main(int argc, char *argv[]) {
     double zoom = 1.0;
     double offsetX = 0.0;
     double offsetY = 0.0;
+    int maxIterations = 1000; // Fixed iteration count for consistency
 
     while(!quit) {
         while(SDL_PollEvent(&e) != 0) {
@@ -44,33 +45,39 @@ int main(int argc, char *argv[]) {
         Uint32* pixels = (Uint32*)screenSurface->pixels;
 
         // Draw a colorful mandelbrot set with zoom
-        for(int y = 0; y < SCREEN_HEIGHT; y++) {
-            for(int x = 0; x < SCREEN_WIDTH; x++) {
+        int skip = (int)(zoom > 5 ? zoom / 5 : 1); // Skip pixels at higher zoom levels for performance
+        for(int y = 0; y < SCREEN_HEIGHT; y += skip) {
+            for(int x = 0; x < SCREEN_WIDTH; x += skip) {
 
                 // Calculate the mandelbrot set with zoom and offset
                 double cr = (x - SCREEN_WIDTH/2.0) * 4.0 / (SCREEN_WIDTH * zoom) + offsetX;
                 double ci = (y - SCREEN_HEIGHT/2.0) * 4.0 / (SCREEN_WIDTH * zoom) + offsetY;
                 double zr = 0, zi = 0;
                 int i = 0;
-                while(i < 1000 && zr*zr + zi*zi < 4.0) {
+                while(i < maxIterations && zr*zr + zi*zi < 4.0) {
                     double temp = zr*zr - zi*zi + cr;
                     zi = 2.0 * zr * zi + ci;
                     zr = temp;
                     i++;
                 }
 
-                // Color mapping based on iteration count with a gradient of red, orange, and yellow
-                if (i == 1000) {
-                    // Points inside the Mandelbrot set are colored with a fiery gradient
-                    double magnitude = sqrt(zr * zr + zi * zi);
-                    int red = (int)(fabs(sin(magnitude)) * 255);
-                    int green = (int)(fabs(sin(magnitude)) * 50); // Further reduce green for a more fiery look
-                    int blue = 0; // Set blue to 0 for warm colors only
-                    pixels[y * SCREEN_WIDTH + x] = SDL_MapRGB(screenSurface->format, red, green, blue);
+                // Color mapping based on iteration count with a gradient representing depth
+                double t = (double)i / maxIterations;
+                int red, green, blue;
+                if (i == maxIterations) {
+                    // Points inside the Mandelbrot set are colored with a deep red
+                    red = 0;
+                    green = 0;
+                    blue = 0;
                 } else {
-                    // Points outside the Mandelbrot set are black
-                    pixels[y * SCREEN_WIDTH + x] = SDL_MapRGB(screenSurface->format, 0,0,0);
+                    // Points outside the Mandelbrot set are colored using a cycling gradient
+                    red = (int)(255 * (0.5 * sin(zoom * 0.1 + t * 6.28) + 0.5));
+                    green = (int)(150 * (0.5 * sin(zoom * 0.1 + t * 6.28 + 2.0) + 0.5));
+                    blue = (int)(50 * (0.5 * sin(zoom * 0.1 + t * 6.28 + 4.0) + 0.5));
                 }
+
+                // Set the pixel color
+                pixels[y * SCREEN_WIDTH + x] = SDL_MapRGB(screenSurface->format, red, green, blue);
             }
         }
 
