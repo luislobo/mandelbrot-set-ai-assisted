@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <SDL2/SDL.h>
 #include <math.h>
+#include <omp.h> // For OpenMP parallelism
 
 const int SCREEN_WIDTH = 800;
 const int SCREEN_HEIGHT = 600;
@@ -32,6 +33,9 @@ int main(int argc, char *argv[]) {
     double offsetY = 0.0;
     int maxIterations = 1000; // Fixed iteration count for consistency
 
+    // Buffer to store color values before rendering
+    Uint32* colorBuffer = (Uint32*)malloc(SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(Uint32));
+
     while(!quit) {
         while(SDL_PollEvent(&e) != 0) {
             if(e.type == SDL_QUIT) {
@@ -39,13 +43,9 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        // Lock the surface to directly manipulate the pixels
-        SDL_LockSurface(screenSurface);
-
-        Uint32* pixels = (Uint32*)screenSurface->pixels;
-
-        // Draw a colorful mandelbrot set with zoom
         int skip = (int)(zoom > 5 ? zoom / 5 : 1); // Skip pixels at higher zoom levels for performance
+
+        #pragma omp parallel for collapse(2) schedule(dynamic, 4)
         for(int y = 0; y < SCREEN_HEIGHT; y += skip) {
             for(int x = 0; x < SCREEN_WIDTH; x += skip) {
 
@@ -76,8 +76,28 @@ int main(int argc, char *argv[]) {
                     blue = (int)(50 * (0.5 * sin(zoom * 0.1 + t * 6.28 + 4.0) + 0.5));
                 }
 
-                // Set the pixel color
-                pixels[y * SCREEN_WIDTH + x] = SDL_MapRGB(screenSurface->format, red, green, blue);
+                Uint32 color = SDL_MapRGB(screenSurface->format, red, green, blue);
+
+                for (int sy = 0; sy < skip; sy++) {
+                    for (int sx = 0; sx < skip; sx++) {
+                        if (y + sy < SCREEN_HEIGHT && x + sx < SCREEN_WIDTH) {
+                            colorBuffer[(y + sy) * SCREEN_WIDTH + (x + sx)] = color;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Lock the surface to directly manipulate the pixels
+        SDL_LockSurface(screenSurface);
+
+        Uint32* pixels = (Uint32*)screenSurface->pixels;
+
+        // Copy color buffer to the surface pixels
+        #pragma omp parallel for collapse(2) schedule(static)
+        for (int y = 0; y < SCREEN_HEIGHT; y++) {
+            for (int x = 0; x < SCREEN_WIDTH; x++) {
+                pixels[y * SCREEN_WIDTH + x] = colorBuffer[y * SCREEN_WIDTH + x];
             }
         }
 
@@ -87,9 +107,10 @@ int main(int argc, char *argv[]) {
         SDL_UpdateWindowSurface(window);
 
         // Zoom in gradually
-        zoom *= 1.05;
+        zoom *= 1.02;
     }
 
+    free(colorBuffer);
     SDL_DestroyWindow(window);
 
     SDL_Quit();
